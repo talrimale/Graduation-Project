@@ -1,5 +1,6 @@
 from aes_tables import S_BOX, INV_S_BOX
 
+# Block 1: Zero Padding & Split Blocks
 def pad_zero(data, block_size=16):
     padding_needed = (block_size - (len(data) % block_size)) % block_size
     return data + [0x00] * padding_needed
@@ -7,6 +8,7 @@ def pad_zero(data, block_size=16):
 def split_blocks(data, block_size=16):
     return [data[i:i + block_size] for i in range(0, len(data), block_size)]
 
+# Block 2: State Matrix Setup (Column-wise)
 def bytes_to_state_columnwise(data):
     state = [[0] * 4 for _ in range(4)]
     for col in range(4):
@@ -21,6 +23,7 @@ def state_to_bytes_columnwise(state):
             result.append(state[row][col])
     return result
 
+# Block 3: Core Operations (XOR, SubBytes, ShiftRows)
 def xor_states(a, b):
     return [[a[r][c] ^ b[r][c] for c in range(4)] for r in range(4)]
 
@@ -42,6 +45,7 @@ def inv_shift_rows(state):
         result[r] = state[r][-r:] + state[r][:-r] if r else state[r][:]
     return result
 
+# Block 4: Galois Math & MixColumns
 def gmul(a, b):
     p = 0
     for _ in range(8):
@@ -95,6 +99,7 @@ def clean_zero_padding(data):
         data.pop()
     return data
 
+# Block 5: UTF-8 Conversion & Session Key Prep
 def text_to_bytes(text):
     return list(text.encode("utf-8"))
 
@@ -106,6 +111,7 @@ def prepare_key(key_text):
     key_bytes = pad_zero(key_bytes, 16)
     return bytes_to_state_columnwise(key_bytes[:16])
 
+# Block 6: Single Block Logic
 def encrypt_block(block_bytes, key_state):
     state = bytes_to_state_columnwise(block_bytes)
     state = xor_states(state, key_state)
@@ -132,6 +138,7 @@ def hex_string_to_states(hex_text):
     all_bytes = [int(hex_text[i:i+2], 16) for i in range(0, len(hex_text), 2)]
     return [bytes_to_state_columnwise(block) for block in split_blocks(all_bytes, 16)]
 
+# Block 7: Full Message Handling & HEX Output
 def encrypt_message(plaintext, key_text):
     text_bytes = text_to_bytes(plaintext)
     padded = pad_zero(text_bytes, 16)
