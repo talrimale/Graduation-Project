@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from aes_tables import S_BOX, INV_S_BOX
 
 def pad_zero(data, block_size=16):
