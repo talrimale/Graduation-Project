@@ -165,14 +165,20 @@ def main():
 
         if choice == "1":
             plaintext = input("Enter plaintext: ")
-            key = input("Enter key: ")
+            key = input("Enter key (press Enter to use default 'SECRETKEY'): ").strip()
+            if not key:
+                key = "SECRETKEY"
+                
             cipher_hex = encrypt_message(plaintext, key)
             print("\nEncrypted text (HEX):")
             print(cipher_hex)
 
         elif choice == "2":
             cipher_hex = input("Enter ciphertext hex: ")
-            key = input("Enter key: ")
+            key = input("Enter key (press Enter to use default 'SECRETKEY'): ").strip()
+            if not key:
+                key = "SECRETKEY"
+                
             try:
                 plaintext = decrypt_message(cipher_hex, key)
                 print("\nDecrypted text:")
@@ -182,10 +188,14 @@ def main():
 
         elif choice == "3":
             plaintext = input("Enter plaintext: ")
-            key = input("Enter key: ")
+            key = input("Enter key (press Enter to use default 'SECRETKEY'): ").strip()
+            if not key:
+                key = "SECRETKEY"
+                
             cipher_hex = encrypt_message(plaintext, key)
             print("\nEncrypted text (HEX):")
             print(cipher_hex)
+
             decrypted = decrypt_message(cipher_hex, key)
             print("\nDecrypted text:")
             print(decrypted)
@@ -193,7 +203,6 @@ def main():
         elif choice == "4":
             print("Goodbye")
             break
-
         else:
             print("Invalid choice, try again.")
 
