@@ -43,7 +43,7 @@ def pad_zero(data, block_size=16):
     return data + [0x00] * padding_needed
 
 def split_blocks(data, block_size=16):
-    return [data[i:i+block_size] for i in range(0, len(data), block_size)]
+    return [data[i:i + block_size] for i in range(0, len(data), block_size)]
 
 def bytes_to_state_columnwise(data):
     state = [[0] * 4 for _ in range(4)]
@@ -53,11 +53,11 @@ def bytes_to_state_columnwise(data):
     return state
 
 def state_to_bytes_columnwise(state):
-    out = []
+    result = []
     for col in range(4):
         for row in range(4):
-            out.append(state[row][col])
-    return out
+            result.append(state[row][col])
+    return result
 
 def xor_states(a, b):
     return [[a[r][c] ^ b[r][c] for c in range(4)] for r in range(4)]
@@ -69,16 +69,16 @@ def inv_sub_bytes(state):
     return [[INV_S_BOX[v >> 4][v & 0x0F] for v in row] for row in state]
 
 def shift_rows(state):
-    out = [row[:] for row in state]
+    result = [row[:] for row in state]
     for r in range(4):
-        out[r] = state[r][r:] + state[r][:r]
-    return out
+        result[r] = state[r][r:] + state[r][:r]
+    return result
 
 def inv_shift_rows(state):
-    out = [row[:] for row in state]
+    result = [row[:] for row in state]
     for r in range(4):
-        out[r] = state[r][-r:] + state[r][:-r] if r else state[r][:]
-    return out
+        result[r] = state[r][-r:] + state[r][:-r] if r else state[r][:]
+    return result
 
 def gmul(a, b):
     p = 0
@@ -111,87 +111,51 @@ def inv_mix_single_column(col):
     ]
 
 def mix_columns(state):
-    out = [[0] * 4 for _ in range(4)]
+    result = [[0] * 4 for _ in range(4)]
     for c in range(4):
         col = [state[r][c] for r in range(4)]
         mixed = mix_single_column(col)
         for r in range(4):
-            out[r][c] = mixed[r]
-    return out
+            result[r][c] = mixed[r]
+    return result
 
 def inv_mix_columns(state):
-    out = [[0] * 4 for _ in range(4)]
+    result = [[0] * 4 for _ in range(4)]
     for c in range(4):
         col = [state[r][c] for r in range(4)]
         mixed = inv_mix_single_column(col)
         for r in range(4):
-            out[r][c] = mixed[r]
-    return out
-
-def print_state(title, state):
-    print(f"\n{title}")
-    print("W0   W1   W2   W3")
-    for r in range(4):
-        print(" ".join(f"{state[r][c]:02X}" for c in range(4)))
+            result[r][c] = mixed[r]
+    return result
 
 def clean_zero_padding(data):
     while data and data[-1] == 0:
         data.pop()
     return data
 
+def text_to_bytes(text):
+    return list(text.encode("utf-8"))
+
+def bytes_to_text(data):
+    return bytes(data).decode("utf-8", errors="replace")
+
 def prepare_key(key_text):
-    key_bytes = [ord(c) for c in key_text]
+    key_bytes = text_to_bytes(key_text)
     key_bytes = pad_zero(key_bytes, 16)
-    first_block = key_bytes[:16]
-    return bytes_to_state_columnwise(first_block)
+    return bytes_to_state_columnwise(key_bytes[:16])
 
-def encrypt_block(block_bytes, key_state, show_steps=False, block_number=1):
+def encrypt_block(block_bytes, key_state):
     state = bytes_to_state_columnwise(block_bytes)
+    state = xor_states(state, key_state)
+    state = sub_bytes(state)
+    state = shift_rows(state)
+    return mix_columns(state)
 
-    if show_steps:
-        print(f"\n================ BLOCK {block_number} ENCRYPTION ================")
-        print_state("Plaintext State Matrix", state)
-
-    xor_state = xor_states(state, key_state)
-    if show_steps:
-        print_state("AddRoundKey / XOR Result Matrix", xor_state)
-
-    sub_state = sub_bytes(xor_state)
-    if show_steps:
-        print_state("SubBytes Result Matrix", sub_state)
-
-    shift_state = shift_rows(sub_state)
-    if show_steps:
-        print_state("ShiftRows Result Matrix", shift_state)
-
-    mix_state = mix_columns(shift_state)
-    if show_steps:
-        print_state("MixColumns Result Matrix", mix_state)
-
-    return mix_state
-
-def decrypt_block(cipher_state, key_state, show_steps=False, block_number=1):
-    if show_steps:
-        print(f"\n================ BLOCK {block_number} DECRYPTION ================")
-        print_state("Ciphertext State Matrix", cipher_state)
-
-    inv_mix_state = inv_mix_columns(cipher_state)
-    if show_steps:
-        print_state("InvMixColumns Result Matrix", inv_mix_state)
-
-    inv_shift_state = inv_shift_rows(inv_mix_state)
-    if show_steps:
-        print_state("InvShiftRows Result Matrix", inv_shift_state)
-
-    inv_sub_state = inv_sub_bytes(inv_shift_state)
-    if show_steps:
-        print_state("InvSubBytes Result Matrix", inv_sub_state)
-
-    recovered_state = xor_states(inv_sub_state, key_state)
-    if show_steps:
-        print_state("AddRoundKey / XOR Result Matrix", recovered_state)
-
-    return recovered_state
+def decrypt_block(cipher_state, key_state):
+    state = inv_mix_columns(cipher_state)
+    state = inv_shift_rows(state)
+    state = inv_sub_bytes(state)
+    return xor_states(state, key_state)
 
 def states_to_hex_string(states):
     all_bytes = []
@@ -204,34 +168,25 @@ def hex_string_to_states(hex_text):
     if len(hex_text) % 32 != 0:
         raise ValueError("Ciphertext hex length must be a multiple of 32 hex characters.")
     all_bytes = [int(hex_text[i:i+2], 16) for i in range(0, len(hex_text), 2)]
-    blocks = split_blocks(all_bytes, 16)
-    return [bytes_to_state_columnwise(block) for block in blocks]
+    return [bytes_to_state_columnwise(block) for block in split_blocks(all_bytes, 16)]
 
-def encrypt_message(plaintext, key_text, show_steps=True):
-    text_bytes = [ord(c) for c in plaintext]
+def encrypt_message(plaintext, key_text):
+    text_bytes = text_to_bytes(plaintext)
     padded = pad_zero(text_bytes, 16)
-    blocks = split_blocks(padded, 16)
+    if not padded:
+        padded = [0] * 16
     key_state = prepare_key(key_text)
+    cipher_states = [encrypt_block(block, key_state) for block in split_blocks(padded, 16)]
+    return states_to_hex_string(cipher_states)
 
-    cipher_states = []
-    for i, block in enumerate(blocks, start=1):
-        cipher_state = encrypt_block(block, key_state, show_steps, i)
-        cipher_states.append(cipher_state)
-
-    cipher_hex = states_to_hex_string(cipher_states)
-    return cipher_hex
-
-def decrypt_message(cipher_hex, key_text, show_steps=True):
+def decrypt_message(cipher_hex, key_text):
     key_state = prepare_key(key_text)
     cipher_states = hex_string_to_states(cipher_hex)
-
     recovered_bytes = []
-    for i, cipher_state in enumerate(cipher_states, start=1):
-        recovered_state = decrypt_block(cipher_state, key_state, show_steps, i)
+    for cipher_state in cipher_states:
+        recovered_state = decrypt_block(cipher_state, key_state)
         recovered_bytes.extend(state_to_bytes_columnwise(recovered_state))
-
-    recovered_bytes = clean_zero_padding(recovered_bytes)
-    return "".join(chr(b) for b in recovered_bytes)
+    return bytes_to_text(clean_zero_padding(recovered_bytes))
 
 def menu():
     print("\nAES Algorithm :\n")
@@ -248,7 +203,7 @@ def main():
         if choice == "1":
             plaintext = input("Enter plaintext: ")
             key = input("Enter key: ")
-            cipher_hex = encrypt_message(plaintext, key, show_steps=True)
+            cipher_hex = encrypt_message(plaintext, key)
             print("\nEncrypted text (HEX):")
             print(cipher_hex)
 
@@ -256,7 +211,7 @@ def main():
             cipher_hex = input("Enter ciphertext hex: ")
             key = input("Enter key: ")
             try:
-                plaintext = decrypt_message(cipher_hex, key, show_steps=True)
+                plaintext = decrypt_message(cipher_hex, key)
                 print("\nDecrypted text:")
                 print(plaintext)
             except Exception as e:
@@ -265,12 +220,10 @@ def main():
         elif choice == "3":
             plaintext = input("Enter plaintext: ")
             key = input("Enter key: ")
-
-            cipher_hex = encrypt_message(plaintext, key, show_steps=True)
+            cipher_hex = encrypt_message(plaintext, key)
             print("\nEncrypted text (HEX):")
             print(cipher_hex)
-
-            decrypted = decrypt_message(cipher_hex, key, show_steps=True)
+            decrypted = decrypt_message(cipher_hex, key)
             print("\nDecrypted text:")
             print(decrypted)
 
