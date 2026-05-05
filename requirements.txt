@@ -1,0 +1,11 @@
+python -m venv venv
+venv\Scripts\activate
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+
+
+pip install cryptography customtkinter
+pip install cryptography
+pip install customtkinter
+pip install sounddevice
+pip install scipy
+
